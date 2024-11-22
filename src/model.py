@@ -1,49 +1,59 @@
 import torch
 import torch.nn as nn
-import torchvision.models as models
-from torchvision.models import ResNet18_Weights
-
+import timm  # Library for pretrained models
 
 class RetinalDiseaseModel(nn.Module):
     """
-    A Convolutional Neural Network (CNN) for multi-label classification
-    of retinal diseases using a modified ResNet-18 architecture.
+    A neural network for detecting disease presence and identifying specific retinal diseases
+    from OCT images.
+
+    Attributes:
+        backbone (timm.models): Pretrained backbone model for feature extraction.
+        disease_risk_head (nn.Sequential): Head for binary disease risk prediction.
+        disease_classification_head (nn.Sequential): Head for multi-label disease classification.
     """
 
-    def __init__(self, num_classes=28):
+    def __init__(self, backbone='resnet50', num_diseases=28):
         """
-        Initializes the model with a pre-trained ResNet-18 backbone and a custom output layer.
+        Initializes the RetinalDiseaseModel.
 
         Args:
-            num_classes (int): Number of output classes (disease labels).
+            backbone (str): The name of the pretrained model to use as a backbone.
+            num_diseases (int): The number of disease classes for multi-label classification.
         """
         super(RetinalDiseaseModel, self).__init__()
+        self.backbone = timm.create_model(backbone, pretrained=True)
+        num_features = self.backbone.get_classifier().in_features
+        self.backbone.reset_classifier(0)
 
-        # Load ResNet-18 model with updated weights parameter
-        self.model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        # Head for predicting if a disease exists (binary classification)
+        self.disease_risk_head = nn.Sequential(
+            nn.Linear(num_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, 1)
+        )
 
-        # Modify the final fully connected layer to match the number of classes
-        self.model.fc = nn.Sequential(
-            nn.Linear(self.model.fc.in_features, num_classes),
-            nn.Sigmoid()  # Sigmoid activation for multi-label classification
+        # Head for identifying specific diseases (multi-label classification)
+        self.disease_classification_head = nn.Sequential(
+            nn.Linear(num_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, num_diseases)
         )
 
     def forward(self, x):
         """
-        Defines the forward pass through the network.
+        Forward pass for the model.
 
         Args:
-            x (torch.Tensor): Input image tensor.
+            x (torch.Tensor): Input tensor representing batch of images.
 
         Returns:
-            torch.Tensor: Output tensor with probabilities for each class.
+            torch.Tensor: Output for disease risk prediction (binary classification).
+            torch.Tensor: Output for specific disease classification (multi-label).
         """
-        return self.model(x)
-
-
-# Example usage
-if __name__ == "__main__":
-    model = RetinalDiseaseModel(num_classes=28)
-    sample_input = torch.randn(8, 3, 224, 224)  # Batch of 8 images, 3 channels, 224x224
-    output = model(sample_input)
-    print("Output shape:", output.shape)  # Expected: [8, 28]
+        features = self.backbone(x)
+        disease_risk_out = self.disease_risk_head(features)
+        disease_labels_out = self.disease_classification_head(features)
+        return disease_risk_out, disease_labels_out
