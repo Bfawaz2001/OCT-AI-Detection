@@ -11,7 +11,7 @@ from torchvision import transforms
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define paths
-model_path = "../outputs/models/retinal_disease_model_v9.pth"
+model_path = "../outputs/models/retinal_disease_model_v15.pth"
 test_csv = "../data/test/RFMiD_Testing_Labels.csv"
 test_dir = "../data/test/images"
 
@@ -85,7 +85,7 @@ def main():
 
     # Evaluate with different thresholds
     for risk_threshold in [0.5, 0.6, 0.7]:
-        for disease_threshold in [0.01, 0.1,0.2, 0.6]:
+        for disease_threshold in [0.0001, 0.1,0.2, 0.6]:
             print(f"\nEvaluating with Risk Threshold: {risk_threshold}, Disease Threshold: {disease_threshold}")
             (disease_risk_acc, disease_risk_prec, disease_risk_recall, disease_risk_f1,
              specific_acc, specific_prec, specific_recall, specific_f1) = evaluate(
